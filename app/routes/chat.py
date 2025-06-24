@@ -11,6 +11,8 @@ from ..models.chat import (
     HealthResponse
 )
 from ..services.chat_service import OptimizedChatService
+import asyncio
+from datetime import datetime
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -61,7 +63,6 @@ async def stream_message(request: ChatRequest):
                 yield f"data: {data}\n\n"
                 
                 # Add a small delay for better UX
-                import asyncio
                 await asyncio.sleep(0.1)
                 
         except Exception as e:
@@ -75,12 +76,13 @@ async def stream_message(request: ChatRequest):
     
     return StreamingResponse(
         generate(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "*",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
         }
     )
 
@@ -170,4 +172,39 @@ async def get_cache_stats():
         return {
             "success": False,
             "error": str(e)
-        } 
+        }
+
+@router.get("/stream/test")
+async def test_stream():
+    """
+    Test streaming endpoint to verify SSE is working
+    """
+    async def generate():
+        steps = [
+            {"step": "test", "content": "Testing streaming...", "is_complete": False},
+            {"step": "test", "content": "Streaming is working!", "is_complete": True}
+        ]
+        
+        for i, step in enumerate(steps):
+            data = json.dumps({
+                "step": step["step"],
+                "content": step["content"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "is_complete": step["is_complete"]
+            })
+            yield f"data: {data}\n\n"
+            
+            if i < len(steps) - 1:
+                await asyncio.sleep(1)
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "X-Accel-Buffering": "no",
+        }
+    ) 

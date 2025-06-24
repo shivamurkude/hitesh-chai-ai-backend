@@ -121,28 +121,40 @@ class OptimizedChatService:
             steps = ["analyze", "think", "output"]
             
             for i, step in enumerate(steps):
-                # Process single step with optimization
-                step_result = await self.hitesh_ai.process_single_step_optimized(content, step)
-                
-                if step_result:
-                    # Create stream step
-                    stream_step = StreamStep(
-                        step=step_result["step"],
-                        content=step_result["content"],
-                        timestamp=step_result["timestamp"],
-                        is_complete=(i == len(steps) - 1)  # Last step
-                    )
+                try:
+                    # Process single step with optimization
+                    step_result = await self.hitesh_ai.process_single_step_optimized(content, step)
                     
-                    yield stream_step
-                    
-                    # Reduced delay between steps for better UX
-                    if i < len(steps) - 1:
-                        await asyncio.sleep(0.5)  # Reduced from 1.5s to 0.5s
-                else:
-                    # If step failed, yield error step
+                    if step_result:
+                        # Create stream step
+                        stream_step = StreamStep(
+                            step=step_result["step"],
+                            content=step_result["content"],
+                            timestamp=step_result["timestamp"],
+                            is_complete=(i == len(steps) - 1)  # Last step
+                        )
+                        
+                        yield stream_step
+                        
+                        # Reduced delay between steps for better UX
+                        if i < len(steps) - 1:
+                            await asyncio.sleep(0.1)  # Reduced delay for faster streaming
+                    else:
+                        # If step failed, yield error step
+                        error_step = StreamStep(
+                            step=step,
+                            content=f"Failed to process {step} step",
+                            timestamp=datetime.utcnow(),
+                            is_complete=True
+                        )
+                        yield error_step
+                        break
+                        
+                except Exception as step_error:
+                    print(f"Error processing {step} step: {str(step_error)}")
                     error_step = StreamStep(
                         step=step,
-                        content=f"Failed to process {step} step",
+                        content=f"Error processing {step} step: {str(step_error)}",
                         timestamp=datetime.utcnow(),
                         is_complete=True
                     )
