@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 from .hitesh_ai import OptimizedHiteshAIService
 from ..models.chat import Message, ProcessingStep, ChatResponse, StreamStep
-
+import json
 class OptimizedChatService:
     def __init__(self):
         self.hitesh_ai = OptimizedHiteshAIService()
@@ -59,11 +59,27 @@ class OptimizedChatService:
                 # Find the output step
                 output_step = next((step for step in processing_steps if step["step"] == "output"), None)
                 if output_step:
-                    final_content = output_step["content"]
+                    # Parse JSON content if it's a string
+                    if isinstance(output_step["content"], str):
+                        try:
+                            content_dict = json.loads(output_step["content"])
+                            final_content = content_dict.get("output", "")
+                        except json.JSONDecodeError:
+                            final_content = output_step["content"]
+                    else:
+                        # Content is already a dict
+                        final_content = output_step["content"].get("output", "")
                 else:
-                    # If no output step, use the last step's content
-                    final_content = processing_steps[-1]["content"]
-            
+                    # Handle the last step's content similarly
+                    last_step = processing_steps[-1]
+                    if isinstance(last_step["content"], str):
+                        try:
+                            content_dict = json.loads(last_step["content"])
+                            final_content = content_dict.get("output", "")
+                        except json.JSONDecodeError:
+                            final_content = last_step["content"]
+                    else:
+                        final_content = last_step["content"].get("output", "")
             # Create AI message
             ai_message = Message(
                 type="ai",
